@@ -54,13 +54,11 @@ contract FlashSwaps is
         address token0 = decoded.poolKey.token0;
         address token1 = decoded.poolKey.token1;
 
-        // 在 kyber 网络协议上交换 DAI 为 UNI
-        // 合约借入 1,500 DAI 后，合约执行 uniswapV3FlashCallback 函数。
-        // 首先，它将 1,500 DAI 换成 kyber 协议上的 UNI。
         if (decoded.unikyb) {
+            // 传入false 不执行它
             uint256 amountOut0 = swapOnUniswap(
-                decoded.amount0,
-                token0,
+                decoded.amount0,//1500
+                token0,//DAI
                 decoded.target,
                 decoded.poolFee2
             );
@@ -82,19 +80,21 @@ contract FlashSwaps is
                 decoded.payer
             );
         } else {
+            // 默认执行这个
+            
+            // 合约借入 1,500 DAI 后，首先，它将 1,500 DAI 换成 kyber 协议上的 UNI。
             uint256 amountOut0 = swapOnKyber(
                 decoded.amount0,
                 token0,
                 decoded.target
             );
 
-            // 在 Uniswap 上将 UNI 换成 DAI
             // 合约获得 55.66 UNI 并将它们换成 Uniswap DAI/ETH 0.05% 池和 UNI/ETH 0.05% 池的 DAI。
             uint256 amountOut1 = swapOnUniswap(
-                amountOut0,
-                decoded.target,
-                token0,
-                decoded.poolFee2
+                amountOut0,//55.66
+                decoded.target,//token2 UNI
+                token0,//DAI
+                decoded.poolFee2//500
             );
 
             payback(
@@ -127,17 +127,18 @@ contract FlashSwaps is
         TransferHelper.safeApprove(token0, address(this), amount0Owed);
         TransferHelper.safeApprove(token1, address(this), amount1Owed);
 
-        // 合约用 池费 偿还你借入的金额，
-        // 所以在这种情况下，合约将支付 1,500 DAI * (1 + 0.05%) = 1,500.75 DAI
         if (amount0Owed > 0)
+            // 合约用 池费 偿还你借入的金额，
+            // 所以在这种情况下，合约将支付 1,500 DAI * (1 + 0.05%) = 1,500.75 DAI
+        // 如果合约没有足够的金额来偿还借入的金额，则整个交易将被撤销
             pay(token0, address(this), msg.sender, amount0Owed);
         if (amount1Owed > 0)
             pay(token1, address(this), msg.sender, amount1Owed);
 
-        // 如果合约没有足够的金额来偿还借入的金额，则整个交易将被撤销
         if (amountOut1 > amount0Owed) {
             uint256 profit1 = LowGasSafeMath.sub(amountOut1, amount0Owed);
             TransferHelper.safeApprove(token0, address(this), profit1);
+            // 合约将利润发送到部署者地址
             pay(token0, address(this), payer, profit1);
         }
     }
@@ -151,6 +152,7 @@ contract FlashSwaps is
         TransferHelper.safeApprove(inputToken, address(swapRouter), amountIn);
 
         if (inputToken == WETH || outputToken == WETH) {
+            // @notice 将一个代币的"金额"换成尽可能多的另一个代币
             amountOut = swapRouter.exactInputSingle(
                 ISwapRouter.ExactInputSingleParams({
                     tokenIn: inputToken,
@@ -167,15 +169,15 @@ contract FlashSwaps is
             ISwapRouter.ExactInputParams memory params = ISwapRouter
                 .ExactInputParams({
                     path: abi.encodePacked(
-                        inputToken,
-                        poolFee,
+                        inputToken,//UNI
+                        poolFee,//500
                         WETH,
                         poolFee,
-                        outputToken
+                        outputToken//DAI
                     ),
                     recipient: address(this),
                     deadline: block.timestamp + 200,
-                    amountIn: amountIn,
+                    amountIn: amountIn,//55.66
                     amountOutMinimum: 0
                 });
 
@@ -243,17 +245,19 @@ contract FlashSwaps is
             @notice接收 token0 和/或 token1 并在回调中偿还，另加一笔费用
             @dev 此方法的调用方以 IUniswapV3FlashCallback#uniswapV3FlashCallback 的形式接收回调
             @dev 可用于通过调用来按比例向当前范围内的流动性提供商捐赠基础代币
-            使用 0 金额{0，1} 并从回调发送捐款金额
+            使用 amount0{0，1} 并从回调发送捐款金额
             
             @param收件人 将接收 token0 和 token1 金额的地址
             @param金额0 要发送的 token0 数量
             @param金额1 要发送的令牌数量1
             @param数据 要传递到回调的任何数据
         */
+
+        // 此处已经借来1500dai了
         pool.flash(
             address(this),
-            params.amount0,
-            params.amount1,
+            params.amount0,//1500
+            params.amount1,//0
             abi.encode(
                 FlashCallbackData({
                     amount0: params.amount0,

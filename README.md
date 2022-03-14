@@ -1,6 +1,6 @@
 # [教程](https://medium.com/coinmonks/tutorial-of-flash-swaps-of-uniswap-v3-73c0c846b822)
 
-contract.initFlash -> pool.flash ->
+contract.initFlash -> pool.flash -> uniswapV3FlashCallback -> swapOnUniswap/swapOnKyber -> payback
 
 # 闪存交换示例
 
