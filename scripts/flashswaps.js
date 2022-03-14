@@ -1118,28 +1118,28 @@ priceMonitor = setInterval(async () => {
 }, POLLING_INTERVAL);
 
 async function callFlashContract(
-    borrowingTokenAddress: string,
-    swapingPairTokenAddress: string,
-    isUniKyb: Boolean,
-    amount: number
+    borrowingTokenAddress,
+    swapingPairTokenAddress,
+    isUniKyb,
+    amount,
 ) {
     // 首先部署FlashSwaps合约
-    const Contract = await ethers.getContractFactory('FlashSwaps');
-    const [deployer] = await ethers.getSigners();
-    console.log('deployer:', deployer.address);
-    const provider = ethers.provider;
+    // const Contract = await ethers.getContractFactory('FlashSwaps');
+    // const [deployer] = await ethers.getSigners();
+    // console.log('deployer:', deployer.address);
+    // const provider = ethers.provider;
 
-    const contract = await Contract.deploy(
-        SWAP_ROUTER,
-        uniswapv3factory,
-        ethers.utils.getAddress(weth9),
-        KYBER_ADDRESS
-    );
+    // const contract = await Contract.deploy(
+    //     SWAP_ROUTER,
+    //     uniswapv3factory,
+    //     ethers.utils.getAddress(weth9),
+    //     KYBER_ADDRESS
+    // );
 
     const DECIMALS = 18;
 
-    let swapingPairToken: any;
-    let borrowingToken: any;
+    let swapingPairToken;
+    let borrowingToken;
     swapingPairToken = new ethers.Contract(
         swapingPairTokenAddress,
         IERC20.abi,

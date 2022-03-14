@@ -51,6 +51,19 @@ module.exports = {
                 ),
             network_id: 1,
         },
+        //  truffle migrate --network ropsten --reset
+        ropsten: {
+            provider: () =>
+                new HDWalletProvider(
+                    process.env.PRIVATE_KEY,
+                    `wss://ropsten.infura.io/ws/v3/1b118c1ba6424b8f9e52031c6f967a1d`
+                ),
+            network_id: 3, // Ropsten's id
+            gas: 5500000, // Ropsten的区块限制低于主网
+            confirmations: 2, // 在部署之间等待的 confs 数。（默认值：0）
+            timeoutBlocks: 200, // 部署超时前的块数（最小值/默认值：50）
+            skipDryRun: true, // 在迁移之前跳过试运行？（默认值：对于公共网络为 false）
+        },
         // development: {
         //  host: "127.0.0.1",     // Localhost (default: none)
         //  port: 8545,            // Standard Ethereum port (default: none)
