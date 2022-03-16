@@ -187,7 +187,7 @@
   "sourceMap": "",
   "deployedSourceMap": "",
   "source": "// SPDX-License-Identifier: MIT\r\npragma solidity 0.7.6;\r\n\r\nimport { IERC20 as ERC20 } from \"@openzeppelin/contracts/token/ERC20/IERC20.sol\";\r\n\r\ninterface KyberNetworkProxyInterface {\r\n    function maxGasPrice() external view returns(uint);\r\n    function getUserCapInWei(address user) external view returns(uint);\r\n    function getUserCapInTokenWei(address user, ERC20 token) external view returns(uint);\r\n    function enabled() external view returns(bool);\r\n    function info(bytes32 id) external view returns(uint);\r\n\r\n    function getExpectedRate(ERC20 src, ERC20 dest, uint srcQty) external view\r\n        returns (uint expectedRate, uint slippageRate);\r\n\r\n    function tradeWithHint(ERC20 src, uint srcAmount, ERC20 dest, address destAddress, uint maxDestAmount,\r\n        uint minConversionRate, address walletId, bytes calldata hint) external payable returns(uint);\r\n}\r\n\r\ninterface SimpleNetworkInterface {\r\n    function swapTokenToToken(ERC20 src, uint srcAmount, ERC20 dest, uint minConversionRate) external returns(uint);\r\n    function swapEtherToToken(ERC20 token, uint minConversionRate) external payable returns(uint);\r\n    function swapTokenToEther(ERC20 token, uint srcAmount, uint minConversionRate) external returns(uint);\r\n}\r\n\r\nabstract contract KyberNetworkProxy is KyberNetworkProxyInterface, SimpleNetworkInterface {}\r\n",
-  "sourcePath": "D:\\Desktop\\BlockChainDemo\\flash-swap-example\\contracts\\interfaces\\kyber\\KyberNetworkProxy.sol",
+  "sourcePath": "D:\\Desktop\\flash-swap-example\\contracts\\interfaces\\kyber\\KyberNetworkProxy.sol",
   "ast": {
     "absolutePath": "project:/contracts/interfaces/kyber/KyberNetworkProxy.sol",
     "exportedSymbols": {
@@ -2992,8 +2992,8 @@
     "version": "0.7.6+commit.7338295f.Emscripten.clang"
   },
   "networks": {},
-  "schemaVersion": "3.4.4",
-  "updatedAt": "2022-03-04T09:29:00.308Z",
+  "schemaVersion": "3.4.6",
+  "updatedAt": "2022-03-14T17:07:23.841Z",
   "devdoc": {
     "kind": "dev",
     "methods": {},

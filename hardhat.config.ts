@@ -17,6 +17,7 @@ module.exports = {
   solidity: "0.7.6",
   networks: {
     hardhat: {
+      // 这将向安全帽网络公开一个 JSON-RPC 接口。要使用它，请将您的钱包或应用程序连接到.http://localhost:8545
       forking: {
         url: process.env.ALCHEMY_MAINNET_RPC_URL,
         blockNumber: 12975788

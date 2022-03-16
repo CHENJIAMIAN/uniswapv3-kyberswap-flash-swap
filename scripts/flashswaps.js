@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { ethers } = require('hardhat');
 const IERC20 = require('../artifacts/@openzeppelin/contracts/token/ERC20/IERC20.sol/IERC20.json');
+const FlashSwaps = require('../artifacts/contracts/FlashSwaps.sol/FlashSwaps.json');
 const { getErc20Balance, showErc20Balance } = require('../utils/token');
 const {
     DAI,
@@ -18,6 +19,8 @@ const moment = require('moment-timezone');
 
 // SERVER CONFIG
 const PORT = process.env.PORT || 5000;
+const WalletAddress = process.env.WalletAddress;
+
 const app = express();
 const server = http
     .createServer(app)
@@ -1111,23 +1114,28 @@ async function monitorPrice() {
     monitoringPrice = false;
 }
 
-// Check markets every n seconds
-const POLLING_INTERVAL = Number(process.env.POLLING_INTERVAL) || 1000; // 1 Second
-priceMonitor = setInterval(async () => {
-    await monitorPrice();
-}, POLLING_INTERVAL);
+const provider = new ethers.providers.InfuraProvider(
+    'mainnet',
+    // 'ropsten',
+    process.env.INFURA_KEY
+);
+const privateKey = process.env.PRIVATE_KEY;
+const wallet = new ethers.Wallet(privateKey, provider);
 
 async function callFlashContract(
     borrowingTokenAddress,
     swapingPairTokenAddress,
     isUniKyb,
-    amount,
+    amount
 ) {
     // 首先部署FlashSwaps合约
     // const Contract = await ethers.getContractFactory('FlashSwaps');
+    // const signers = await ethers.getSigners();
     // const [deployer] = await ethers.getSigners();
     // console.log('deployer:', deployer.address);
     // const provider = ethers.provider;
+    // use your own Infura node in production
+ 
 
     // const contract = await Contract.deploy(
     //     SWAP_ROUTER,
@@ -1136,6 +1144,12 @@ async function callFlashContract(
     //     KYBER_ADDRESS
     // );
 
+    const contract = new ethers.Contract(
+        '0x396c5d786ADB2eb78C0dfa7BC2219dA0aF3E851F',
+        FlashSwaps.abi,
+        wallet
+    );
+
     const DECIMALS = 18;
 
     let swapingPairToken;
@@ -1143,17 +1157,17 @@ async function callFlashContract(
     swapingPairToken = new ethers.Contract(
         swapingPairTokenAddress,
         IERC20.abi,
-        provider
+        wallet
     );
     borrowingToken = new ethers.Contract(
         borrowingTokenAddress,
         IERC20.abi,
-        provider
+        wallet
     );
 
     const initialBalance = await getErc20Balance(
         borrowingToken,
-        deployer.address,
+        WalletAddress,
         DECIMALS
     );
     console.log("deployer's initial balance", initialBalance);
@@ -1175,7 +1189,7 @@ async function callFlashContract(
 
     const endingBalance = await getErc20Balance(
         borrowingToken,
-        deployer.address,
+        WalletAddress,
         DECIMALS
     );
     console.log("deployer's ending balance", endingBalance);
@@ -1186,3 +1200,15 @@ async function callFlashContract(
         console.log(`Congrats! You earned ${profit} DAI !!`);
     }
 }
+
+// Check markets every n seconds
+// const POLLING_INTERVAL = Number(process.env.POLLING_INTERVAL) || 1000; // 1 Second
+// priceMonitor = setInterval(async () => {
+//     await monitorPrice();
+// }, POLLING_INTERVAL);
+
+(async () => {
+    await callFlashContract(DAI, UNI, false, 1500);
+})();
+
+// monitorPrice -> checkPairProfitable -> callFlashContract

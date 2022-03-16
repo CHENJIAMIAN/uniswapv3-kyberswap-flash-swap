@@ -12,7 +12,8 @@
         }
       ],
       "stateMutability": "view",
-      "type": "function"
+      "type": "function",
+      "constant": true
     },
     {
       "inputs": [],
@@ -25,7 +26,8 @@
         }
       ],
       "stateMutability": "view",
-      "type": "function"
+      "type": "function",
+      "constant": true
     },
     {
       "inputs": [
@@ -50,7 +52,7 @@
   "sourceMap": "66:352:24:-:0;;;113:10;90:33;;;;;;;;;;;;;;;;;;;;66:352;;;;;;;;;;;;;;;;",
   "deployedSourceMap": "66:352:24:-:0;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;127:36;;;:::i;:::-;;;;;;;;;;;;;;;;;;;90:33;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;313:103;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;;127:36;;;;:::o;90:33::-;;;;;;;;;;;;:::o;313:103::-;225:5;;;;;;;;;;211:19;;:10;:19;;;196:101;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;402:9:::1;375:24;:36;;;;313:103:::0;:::o",
   "source": "// SPDX-License-Identifier: MIT\npragma solidity >=0.4.22 <0.8.0;\n\ncontract Migrations {\n  address public owner = msg.sender;\n  uint public last_completed_migration;\n\n  modifier restricted() {\n    require(\n      msg.sender == owner,\n      \"This function is restricted to the contract's owner\"\n    );\n    _;\n  }\n\n  function setCompleted(uint completed) public restricted {\n    last_completed_migration = completed;\n  }\n}\n",
-  "sourcePath": "D:\\Desktop\\BlockChainDemo\\flash-swap-example\\contracts\\Migrations.sol",
+  "sourcePath": "D:\\Desktop\\flash-swap-example\\contracts\\Migrations.sol",
   "ast": {
     "absolutePath": "project:/contracts/Migrations.sol",
     "exportedSymbols": {
@@ -885,9 +887,17 @@
     "name": "solc",
     "version": "0.7.6+commit.7338295f.Emscripten.clang"
   },
-  "networks": {},
-  "schemaVersion": "3.4.4",
-  "updatedAt": "2022-03-04T09:29:00.295Z",
+  "networks": {
+    "3": {
+      "events": {},
+      "links": {},
+      "address": "0xfd3AD899C0F5724a6AEee9e34A44a061E02B12A1",
+      "transactionHash": "0x32e9f75c183a4164bf319663a1f8a8a7ca4afa5218422d6e2a3fd58a864bd1f6"
+    }
+  },
+  "schemaVersion": "3.4.6",
+  "updatedAt": "2022-03-14T17:15:55.254Z",
+  "networkType": "ethereum",
   "devdoc": {
     "kind": "dev",
     "methods": {},
