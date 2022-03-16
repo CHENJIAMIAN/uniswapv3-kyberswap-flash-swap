@@ -1220,7 +1220,7 @@ async function callFlashContract(
     // }
 }
 
-Check markets every n seconds
+// Check markets every n seconds
 const POLLING_INTERVAL = Number(process.env.POLLING_INTERVAL) || 1000; // 1 Second
 priceMonitor = setInterval(async () => {
     await monitorPrice();
