@@ -1048,6 +1048,7 @@ async function checkPairProfitable(args) {
     const intKyberExpectedRate =
         Number(web3.utils.fromWei(kyberResult.expectedRate)) *
         Number(inputAmountEther);
+    // 0.112 * 100
     const intKyberWorstRate =
         Number(web3.utils.fromWei(kyberResult.worstRate)) *
         Number(inputAmountEther);
@@ -1089,6 +1090,7 @@ const addresses = {
     COMP: '0xc00e94cb662c3520282e6f5717214004a7f26888',
     UNI: '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984',
 };
+
 const inputAmount = web3.utils.toWei('100', 'ETHER');
 async function monitorPrice() {
     if (monitoringPrice) {
@@ -1180,7 +1182,7 @@ async function callFlashContract(
     // 然后调用initFlash 函数执行flash swaps,该函数启动 flash 交换过程
     // 它从uninswap的 token0/token1 池中借入数量为 amount0 的 token0 ，池费为 fee1
     // 在这种情况下，它让你的合约以 0.05% 的费用从 DAI/USDC 池中借入 1,500 DAI 。
-    console.log('contract.initFlash')
+    console.log('contract.initFlash');
     const tx = await contract.initFlash(
         {
             token0: ethers.utils.getAddress(borrowingTokenAddress), //DAI
@@ -1201,31 +1203,31 @@ async function callFlashContract(
             gasPrice: ethers.utils.parseUnits('100', 'gwei'),
         }
     );
-    console.log({tx})
+    console.log({ tx });
     // 执行到了 FlashSwap.sol
 
-    const endingBalance = await getErc20Balance(
-        borrowingToken,
-        WalletAddress,
-        DECIMALS
-    );
-    console.log("deployer's ending balance", endingBalance);
+    // const endingBalance = await getErc20Balance(
+    //     borrowingToken,
+    //     WalletAddress,
+    //     DECIMALS
+    // );
+    // console.log("deployer's ending balance", endingBalance);
 
-    const profit = endingBalance - initialBalance;
+    // const profit = endingBalance - initialBalance;
 
-    if (profit > 0) {
-        console.log(`Congrats! You earned ${profit} DAI !!`);
-    }
+    // if (profit > 0) {
+    //     console.log(`Congrats! You earned ${profit} DAI !!`);
+    // }
 }
 
-// Check markets every n seconds
-// const POLLING_INTERVAL = Number(process.env.POLLING_INTERVAL) || 1000; // 1 Second
-// priceMonitor = setInterval(async () => {
-//     await monitorPrice();
-// }, POLLING_INTERVAL);
+Check markets every n seconds
+const POLLING_INTERVAL = Number(process.env.POLLING_INTERVAL) || 1000; // 1 Second
+priceMonitor = setInterval(async () => {
+    await monitorPrice();
+}, POLLING_INTERVAL);
 
-(async () => {
-    await callFlashContract(DAI, UNI, false, 1500);
-})();
+// (async () => {
+//     await callFlashContract(DAI, UNI, false, 1500);
+// })();
 
 // monitorPrice -> checkPairProfitable -> callFlashContract
