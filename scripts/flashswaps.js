@@ -30,7 +30,8 @@ const server = http
 var web3 = new Web3(
     new Web3.providers.WebsocketProvider(
         process.env.RPC_URL_WS ||
-            `wss://mainnet.infura.io/ws/v3/1b118c1ba6424b8f9e52031c6f967a1d`
+            // `wss://mainnet.infura.io/ws/v3/1b118c1ba6424b8f9e52031c6f967a1d`
+            `wss://ropsten.infura.io/ws/v3/1b118c1ba6424b8f9e52031c6f967a1d`
     )
 );
 
@@ -1012,6 +1013,14 @@ async function checkPairProfitable(args) {
         .call()
         .call();
 
+    let inputTokenContract = new web3.eth.Contract(
+        ERC20_ABI,
+        inputTokenAddress
+    );
+    let inputTokenDecimal = await inputTokenContract.methods.decimals
+        .call()
+        .call();
+
     /* 
         tokenIn	地址	被换入的代币
         tokenOut	地址	被换出的代币
@@ -1035,11 +1044,16 @@ async function checkPairProfitable(args) {
     // 120224367254907314
     // 120203917903719052
     const unires = uniswapResult / 10 ** outputTokenDecimal;
-    const intKyberWorstRate = +kyberResult.worstRate;
+    const inputAmountEther = web3.utils.fromWei(inputAmount, 'Ether');
+    const intKyberExpectedRate =
+        Number(web3.utils.fromWei(kyberResult.expectedRate)) *
+        Number(inputAmountEther);
+    const intKyberWorstRate =
+        Number(web3.utils.fromWei(kyberResult.worstRate)) *
+        Number(inputAmountEther);
+
     const intUniswapResult = +uniswapResult;
-    const rate =
-        (intKyberWorstRate - intUniswapResult) /
-        (intKyberWorstRate + intUniswapResult);
+    const rate = (intKyberWorstRate - unires) / (intKyberWorstRate + unires);
     // print in form of table
     console.table([
         {
@@ -1047,17 +1061,10 @@ async function checkPairProfitable(args) {
             // 120200941374338495  120200831215575705   120199729639056849
             'Input Token': inputTokenSymbol,
             'Output Token': outputTokenSymbol,
-            'Input Amount': web3.utils.fromWei(inputAmount, 'Ether'),
+            'Input Amount': inputAmountEther,
             'Uniswap Return': unires,
-            'Kyber Expected Rate': web3.utils.fromWei(
-                kyberResult.expectedRate, //扣除网络费用后的 src 和 dest 代币的转换率
-                'ether'
-            ),
-            'Kyber Min Return': web3.utils.fromWei(
-                kyberResult.worstRate, //97% 的转换率，允许 3% 的缓冲用于交易中的 minConversionRate
-                // minConversionRate最低转化率；如果实际汇率较低，则取消交易
-                'ether'
-            ),
+            'Kyber Expected Rate': intKyberExpectedRate,
+            'Kyber Min Return': intKyberWorstRate,
             rate,
             'rate > 3%': rate > 0.03,
             Timestamp: moment().tz('Asia/Shanghai').format(),
@@ -1082,8 +1089,7 @@ const addresses = {
     COMP: '0xc00e94cb662c3520282e6f5717214004a7f26888',
     UNI: '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984',
 };
-// 这个只能是1,因为kyber的那个getExpectedRate方法是的作用是获取 1 ETH 等值的源代币到目的代币的预期比率
-const inputAmount = web3.utils.toWei('1', 'ETHER');
+const inputAmount = web3.utils.toWei('100', 'ETHER');
 async function monitorPrice() {
     if (monitoringPrice) {
         return;
@@ -1115,8 +1121,8 @@ async function monitorPrice() {
 }
 
 const provider = new ethers.providers.InfuraProvider(
-    'mainnet',
-    // 'ropsten',
+    // 'mainnet',
+    'ropsten',
     process.env.INFURA_KEY
 );
 const privateKey = process.env.PRIVATE_KEY;
@@ -1135,7 +1141,6 @@ async function callFlashContract(
     // console.log('deployer:', deployer.address);
     // const provider = ethers.provider;
     // use your own Infura node in production
- 
 
     // const contract = await Contract.deploy(
     //     SWAP_ROUTER,
@@ -1175,16 +1180,28 @@ async function callFlashContract(
     // 然后调用initFlash 函数执行flash swaps,该函数启动 flash 交换过程
     // 它从uninswap的 token0/token1 池中借入数量为 amount0 的 token0 ，池费为 fee1
     // 在这种情况下，它让你的合约以 0.05% 的费用从 DAI/USDC 池中借入 1,500 DAI 。
-    const tx = await contract.initFlash({
-        token0: ethers.utils.getAddress(borrowingTokenAddress), //DAI
-        token1: ethers.utils.getAddress(USDC),
-        token2: ethers.utils.getAddress(swapingPairTokenAddress), //UNI 中介币
-        fee1: 500,
-        amount0: ethers.utils.parseUnits(amount.toString(), DECIMALS), //1500
-        amount1: 0, // 由于脚本将 0 作为amount1参数传递，因此合约不会借用任何 USDC
-        fee2: 500,
-        unikyb: isUniKyb,
-    });
+    console.log('contract.initFlash')
+    const tx = await contract.initFlash(
+        {
+            token0: ethers.utils.getAddress(borrowingTokenAddress), //DAI
+            token1: ethers.utils.getAddress(USDC),
+            token2: ethers.utils.getAddress(swapingPairTokenAddress), //UNI 中介币
+            fee1: 500,
+            amount0: ethers.utils.parseUnits(amount.toString(), DECIMALS), //1500
+            amount1: 0, // 由于脚本将 0 作为amount1参数传递，因此合约不会借用任何 USDC
+            fee2: 500,
+            unikyb: isUniKyb,
+        },
+        {
+            // Every Contract method may take one additional (optional) parameter which specifies the transaction (or call) overrides
+            // The maximum units of gas for the transaction to use
+            gasLimit: 100_0000,
+
+            // The price (in wei) per unit of gas
+            gasPrice: ethers.utils.parseUnits('100', 'gwei'),
+        }
+    );
+    console.log({tx})
     // 执行到了 FlashSwap.sol
 
     const endingBalance = await getErc20Balance(
