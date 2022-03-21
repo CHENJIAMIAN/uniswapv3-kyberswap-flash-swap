@@ -1,5 +1,3 @@
-require('dotenv').config();
-
 const DAI = '0x6B175474E89094C44Da98b954EedeAC495271d0F';
 const UNI = '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984';
 const DAI_WHALE = '0xA929022c9107643515F5c777cE9a910F0D1e490C';
@@ -14,15 +12,16 @@ const uniswapv3factory = '0x1F98431c8aD98523631AE4a59f267346ea31F984';
 const KYBER_ADDRESS = '0x818E6FECD516Ecc3849DAf6845e3EC868087B755';
 const weth9 = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2';
 
-const Web3 = require('web3');
 const { ethers } = require('hardhat');
 const moment = require('moment-timezone');
 
-const kyberNetProxyABI = require('./KyberNetworkProxy-v2.0.0-ABI.json');
 const ERC20 = require('@openzeppelin/contracts/build/contracts/ERC20.json');
 const FlashSwaps = require('../artifacts/contracts/FlashSwaps.sol/FlashSwaps.json');
 const IQuoter = require('@uniswap/v3-periphery/artifacts/contracts/interfaces/IQuoter.sol/IQuoter.json');
 const { getErc20Balance, showErc20Balance } = require('../utils/token');
+const request = require('request');
+const util = require('util');
+const fetch = util.promisify(request.get);
 
 (async function () {
     // 主网测试
@@ -61,22 +60,6 @@ const { getErc20Balance, showErc20Balance } = require('../utils/token');
         IQuoter.abi,
         wallet
     );
-    const kyberNetProxyContract = new ethers.Contract(
-        '0x9AAb3f75489902f3a48495025729a0AF77d4b11e',
-        kyberNetProxyABI,
-        wallet
-    );
-
-    // WEB3 CONFIG
-    var web3 = new Web3(
-        new Web3.providers.WebsocketProvider(
-            'wss://mainnet.infura.io/ws/v3/1b118c1ba6424b8f9e52031c6f967a1d'
-        )
-    );
-    var uniswapRouter = new web3.eth.Contract(
-        IQuoter.abi,
-        '0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6'
-    );
 
     // this checks and prints the exchange rates between 2 DEXES for any 2 tokens
     async function checkPairProfitable(args) {
@@ -103,59 +86,57 @@ const { getErc20Balance, showErc20Balance } = require('../utils/token');
         amountIn	uint256	所需输入量
         sqrtPriceLimitX96	uint160	交易所不能超过的矿池价格限制
         */
-        let uniswapResult = await uniswapRouter.methods
-            .quoteExactInputSingle(
+        let uniswapResultWei =
+            await uniswapQuoter.callStatic.quoteExactInputSingle(
                 inputTokenAddress,
                 outputTokenAddress,
                 3000, //表示0.3%,添加流动性时，手续费可以有 3个级别供选择：0.05%, 0.3% 和 1%，未来可以通过治理加入更多可选的手续费率
                 // 一个代币对 v3 版本会有多个不同的流动池。例如 ETH/DAI 代币对，会分成三个池，分别对应 0.05%, 0.30%, 1.00% 的手续费
                 ethers.utils.formatUnits(inputAmountWei, 0),
                 0
-            )
-            .call();
-        // 需要gasFee,返回的是tx, 不是结果, 为什么?
-        // let uniswapResult = await uniswapQuoter.quoteExactInputSingle(
-        //     inputTokenAddress,
-        //     outputTokenAddress,
-        //     3000, //表示0.3%,添加流动性时，手续费可以有 3个级别供选择：0.05%, 0.3% 和 1%，未来可以通过治理加入更多可选的手续费率
-        //     // 一个代币对 v3 版本会有多个不同的流动池。例如 ETH/DAI 代币对，会分成三个池，分别对应 0.05%, 0.30%, 1.00% 的手续费
-        //     ethers.utils.formatUnits(inputAmountWei, 0),
-        //     0
-        // );
+            );
         // 不需要gasFee
-        let kyberResult = await kyberNetProxyContract.getExpectedRate(
-            inputTokenAddress,
-            outputTokenAddress,
-            ethers.utils.formatUnits(inputAmountWei, 0)
+        const gas_res = await fetch(
+            'https://api.krystal.app/ethereum/v2/swap/gasPrice'
         );
-        console.log({ uniswapResult, kyberResult: kyberResult.worstRate });
+        const gas_res_json = await gas_res.json();
+        const kyber_res = await fetch(
+            `https://aggregator-api.kyberswap.com/ethereum/route?tokenIn=${outputTokenAddress}&tokenOut=${inputTokenAddress}&amountIn=${ethers.utils.formatUnits(
+                inputAmountWei,
+                0
+            )}&saveGas=0&gasInclude=0&gasPrice=${
+                gas_res_json.gasPrice.default
+            }000000000`
+        );
+        const kyber_res_json = await kyber_res.json();
+        console.log(kyber_res_json.outputAmount);
 
-        const uniResultEther = uniswapResult / 10 ** outputTokenDecimal;
         const inputAmountEther = ethers.utils.formatEther(inputAmountWei);
-        // const intKyberExpectedRate =
-        //     Number(ethers.utils.formatEther(kyberResult.expectedRate)) *
-        //     Number(inputAmountEther);
-        const kyberWorstResultEther =
-            Number(ethers.utils.formatEther(kyberResult.worstRate)) *
-            Number(inputAmountEther);
-
-        const rate =
-            (kyberWorstResultEther - uniResultEther) /
-            (kyberWorstResultEther + uniResultEther);
-        // print in form of table
+        const uniResultEther = uniswapResultWei / 10 ** outputTokenDecimal;
         console.table([
             {
-                'Input Token': inputTokenSymbol,
-                'Output Token': outputTokenSymbol,
-                'Input Amount': inputAmountEther,
-                'Uniswap Return': uniResultEther,
-                // 'Kyber Expected Rate': intKyberExpectedRate,
-                'Kyber Min Return': kyberWorstResultEther,
-                rate,
-                'rate > 3%': rate > 0.03,
-                Timestamp: moment().tz('Asia/Shanghai').format(),
+                uniswapResultWei,
+                进来的代币: inputAmountEther,
+                从uniswap换得: uniResultEther + '个中介币',
+                kyber换回:
+                    ethers.utils.formatEther(kyber_res_json.outputAmount) +
+                    '个原始币',
             },
         ]);
+
+        // // print in form of table
+        // console.table([
+        //     {
+        //         'Input Token': inputTokenSymbol,
+        //         'Output Token': outputTokenSymbol,
+        //         'Input Amount': inputAmountEther,
+        //         'Uniswap Return': uniResultEther,
+        //         'Kyber Return': kyberWorstResultEther,
+        //         rate,
+        //         'rate > 3%': rate > 0.03,
+        //         Timestamp: moment().tz('Asia/Shanghai').format(),
+        //     },
+        // ]);
         if (rate > 0.03)
             await callFlashContract(
                 inputTokenAddress,
@@ -174,6 +155,8 @@ const { getErc20Balance, showErc20Balance } = require('../utils/token');
         WBTC: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
         COMP: '0xc00e94cb662c3520282e6f5717214004a7f26888',
         UNI: '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984',
+        AAVE: '0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9',
+        AMP: '0xff20817765cb7f73d4bde2e66e067e58d11095c2',
     };
     async function monitorPrice() {
         const inputAmount = '100'; //要交换的数量 100个Ether, 此处1Ether表示一个单位, 不是表示一个ETH
