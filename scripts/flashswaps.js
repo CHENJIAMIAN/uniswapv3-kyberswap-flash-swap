@@ -158,6 +158,7 @@ const fetch = util.promisify(request.get);
         AAVE: '0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9',
         AMP: '0xff20817765cb7f73d4bde2e66e067e58d11095c2',
     };
+
     async function monitorPrice() {
         const inputAmount = '100'; //要交换的数量 100个Ether, 此处1Ether表示一个单位, 不是表示一个ETH
         const inputAmountWei = ethers.utils.parseEther(inputAmount);
@@ -287,7 +288,7 @@ const fetch = util.promisify(request.get);
     priceMonitorInterval = setInterval(async () => {
         await monitorPrice();
     }, POLLING_INTERVAL);
-
+    d;
     // 测试callFlashContract
     // (async () => {
     //     await callFlashContract(DAI, UNI, false, 1500);

@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-pragma solidity =0.7.6;
+pragma solidity >0.7.6;
 pragma abicoder v2;
 
 import "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3FlashCallback.sol";
 import "@uniswap/v3-core/contracts/libraries/LowGasSafeMath.sol";
 
-import {KyberNetworkProxy as IKyberNetworkProxy} from "./interfaces/kyber/KyberNetworkProxy.sol";
+import "https://github.com/KyberNetwork/dmm-smart-contracts/blob/master/contracts/interfaces/IDMMRouter02.sol";
+import "https://github.com/KyberNetwork/dmm-smart-contracts/blob/master/contracts/interfaces/IDMMFactory.sol";
 import "@uniswap/v3-periphery/contracts/base/PeripheryPayments.sol";
 import "@uniswap/v3-periphery/contracts/base/PeripheryImmutableState.sol";
 import "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
@@ -13,8 +14,6 @@ import "@uniswap/v3-periphery/contracts/libraries/CallbackValidation.sol";
 import "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "./Base.sol";
-
-
 
 contract FlashSwaps is
     IUniswapV3FlashCallback,
@@ -25,7 +24,9 @@ contract FlashSwaps is
     using LowGasSafeMath for uint256;
     using LowGasSafeMath for int256;
 
-    IKyberNetworkProxy kyber;
+    IDMMRouter02 public dmmRouter;
+    IDMMFactory public dmmFactory;
+
     ISwapRouter public immutable swapRouter;
     address internal WETH;
 
@@ -33,10 +34,14 @@ contract FlashSwaps is
         ISwapRouter _swapRouter,
         address _factory,
         address _WETH9,
-        address kyberAddress
+        IDMMRouter02 _dmmRouter,
+        IDMMFactory _dmmFactory,
+        uint256 _amountOutMin
     ) PeripheryImmutableState(_factory, _WETH9) {
+        amountOutMin = _amountOutMin;
         swapRouter = _swapRouter;
-        kyber = IKyberNetworkProxy(kyberAddress);
+        dmmRouter = _dmmRouter;
+        dmmFactory = _dmmFactory;
         WETH = _WETH9;
     }
 
@@ -57,8 +62,8 @@ contract FlashSwaps is
         if (decoded.unikyb) {
             // 传入false 不执行它
             uint256 amountOut0 = swapOnUniswap(
-                decoded.amount0,//1500
-                token0,//DAI
+                decoded.amount0, //1500
+                token0, //DAI
                 decoded.target,
                 decoded.poolFee2
             );
@@ -81,7 +86,7 @@ contract FlashSwaps is
             );
         } else {
             // 默认执行这个
-            
+
             // 合约借入 1,500 DAI 后，首先，它将 1,500 DAI 换成 kyber 协议上的 UNI。
             uint256 amountOut0 = swapOnKyber(
                 decoded.amount0,
@@ -91,10 +96,10 @@ contract FlashSwaps is
 
             // 合约获得 55.66 UNI 并将它们换成 Uniswap DAI/ETH 0.05% 池和 UNI/ETH 0.05% 池的 DAI。
             uint256 amountOut1 = swapOnUniswap(
-                amountOut0,//55.66
-                decoded.target,//token2 UNI
-                token0,//DAI
-                decoded.poolFee2//500
+                amountOut0, //55.66
+                decoded.target, //token2 UNI
+                token0, //DAI
+                decoded.poolFee2 //500
             );
 
             payback(
@@ -130,7 +135,7 @@ contract FlashSwaps is
         if (amount0Owed > 0)
             // 合约用 池费 偿还你借入的金额，
             // 所以在这种情况下，合约将支付 1,500 DAI * (1 + 0.05%) = 1,500.75 DAI
-        // 如果合约没有足够的金额来偿还借入的金额，则整个交易将被撤销
+            // 如果合约没有足够的金额来偿还借入的金额，则整个交易将被撤销
             pay(token0, address(this), msg.sender, amount0Owed);
         if (amount1Owed > 0)
             pay(token1, address(this), msg.sender, amount1Owed);
@@ -152,7 +157,7 @@ contract FlashSwaps is
         TransferHelper.safeApprove(inputToken, address(swapRouter), amountIn);
 
         if (inputToken == WETH || outputToken == WETH) {
-            // @notice 将一个代币的"金额"换成尽可能多的另一个代币
+            // 尽可能amountIn多地将一种代币换成另一种代币
             amountOut = swapRouter.exactInputSingle(
                 ISwapRouter.ExactInputSingleParams({
                     tokenIn: inputToken,
@@ -169,18 +174,18 @@ contract FlashSwaps is
             ISwapRouter.ExactInputParams memory params = ISwapRouter
                 .ExactInputParams({
                     path: abi.encodePacked(
-                        inputToken,//UNI
-                        poolFee,//500
+                        inputToken, //UNI
+                        poolFee, //500
                         WETH,
                         poolFee,
-                        outputToken//DAI
+                        outputToken //DAI
                     ),
                     recipient: address(this),
                     deadline: block.timestamp + 200,
-                    amountIn: amountIn,//55.66
+                    amountIn: amountIn, //55.66
                     amountOutMinimum: 0
                 });
-
+            // amountIn沿指定路径将一个令牌尽可能多地交换为另一个令牌
             amountOut = swapRouter.exactInput(params);
         }
     }
@@ -190,19 +195,26 @@ contract FlashSwaps is
         address inputToken,
         address outputToken
     ) internal returns (uint256 amountOut) {
-        (uint256 expectedRate, ) = kyber.getExpectedRate(
-            IERC20(inputToken),
-            IERC20(outputToken),
+        TransferHelper.safeApprove(
+            inputToken,
+            address(dmmRouter),
             amountIn
         );
-
-        TransferHelper.safeApprove(inputToken, address(kyber), amountIn);
+        IERC20[] memory path = new address[](2);
+        path[0] = inputToken; // assuming usdc is specified as IERC20
+        path[1] = outputToken; // assuming wbtc is specified as IERC20
+        address poolAddress = dmmFactory.getUnamplifiedPool(inputToken, outputToken);
+        // use unamplified pool
+        addresss[] memory poolsPath = new address[](1);
+        poolsPath[0] = poolAddress;
         try
-            kyber.swapTokenToToken(
-                IERC20(inputToken),
+            dmmRouter.swapExactTokensForTokens(
                 amountIn,
-                IERC20(outputToken),
-                expectedRate
+                amountOutMin,
+                poolsPath,//address[] calldata poolsPath,//// eg. [usdc-wbtc-pool, wbtc-weth-pool]
+                path//IERC20[] calldata path,
+                msg.sender, //address to,  
+                block.timestamp + 100// uint256 deadline 
             )
         returns (uint256 bal) {
             amountOut = bal;
@@ -256,8 +268,8 @@ contract FlashSwaps is
         // 此处已经借来1500dai了
         pool.flash(
             address(this),
-            params.amount0,//1500
-            params.amount1,//0
+            params.amount0, //1500
+            params.amount1, //0
             abi.encode(
                 FlashCallbackData({
                     amount0: params.amount0,
