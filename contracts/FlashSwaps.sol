@@ -1,18 +1,21 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-pragma solidity >0.7.6;
+pragma solidity =0.7.6;
 pragma abicoder v2;
 
 import "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3FlashCallback.sol";
 import "@uniswap/v3-core/contracts/libraries/LowGasSafeMath.sol";
 
-import "https://github.com/KyberNetwork/dmm-smart-contracts/blob/master/contracts/interfaces/IDMMRouter02.sol";
-import "https://github.com/KyberNetwork/dmm-smart-contracts/blob/master/contracts/interfaces/IDMMFactory.sol";
+import "../contracts/interfaces/IDMMRouter02.sol";
+import "../contracts/interfaces/IDMMFactory.sol";
 import "@uniswap/v3-periphery/contracts/base/PeripheryPayments.sol";
 import "@uniswap/v3-periphery/contracts/base/PeripheryImmutableState.sol";
 import "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
 import "@uniswap/v3-periphery/contracts/libraries/CallbackValidation.sol";
 import "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "hardhat/console.sol";
+
 import "./Base.sol";
 
 contract FlashSwaps is
@@ -29,6 +32,7 @@ contract FlashSwaps is
 
     ISwapRouter public immutable swapRouter;
     address internal WETH;
+    uint256 amountOutMin;
 
     constructor(
         ISwapRouter _swapRouter,
@@ -195,32 +199,37 @@ contract FlashSwaps is
         address inputToken,
         address outputToken
     ) internal returns (uint256 amountOut) {
-        TransferHelper.safeApprove(
-            inputToken,
-            address(dmmRouter),
-            amountIn
+        TransferHelper.safeApprove(inputToken, address(dmmRouter), amountIn);
+        IERC20[] memory path = new IERC20[](2);
+        path[0] = IERC20(inputToken); // assuming usdc is specified as IERC20
+        path[1] = IERC20(outputToken); // assuming wbtc is specified as IERC20
+        address poolAddress = dmmFactory.getUnamplifiedPool(//只能获取极少数的pool
+            IERC20(inputToken),
+            IERC20(outputToken)
         );
-        IERC20[] memory path = new address[](2);
-        path[0] = inputToken; // assuming usdc is specified as IERC20
-        path[1] = outputToken; // assuming wbtc is specified as IERC20
-        address poolAddress = dmmFactory.getUnamplifiedPool(inputToken, outputToken);
         // use unamplified pool
-        addresss[] memory poolsPath = new address[](1);
+        address[] memory poolsPath = new address[](1);
         poolsPath[0] = poolAddress;
-        try
-            dmmRouter.swapExactTokensForTokens(
-                amountIn,
-                amountOutMin,
-                poolsPath,//address[] calldata poolsPath,//// eg. [usdc-wbtc-pool, wbtc-weth-pool]
-                path//IERC20[] calldata path,
-                msg.sender, //address to,  
-                block.timestamp + 100// uint256 deadline 
-            )
-        returns (uint256 bal) {
-            amountOut = bal;
-        } catch {
-            revert("KE");
-        }
+        console.log("amountIn:%s", amountIn);
+        console.log("amountOutMin:%s", amountOutMin);
+        console.log("poolAddress:%s", poolAddress);
+        console.log("msg.sender:%s", msg.sender);
+        console.log("deadline:%s", block.timestamp + 100);
+        // try
+        uint256[] memory amounts = dmmRouter.swapExactTokensForTokens(
+            amountIn,
+            amountOutMin,
+            poolsPath, //address[] calldata poolsPath,//// eg. [usdc-wbtc-pool, wbtc-weth-pool]//poolsPath.length = path.length - 1
+            path, //IERC20[] calldata path,
+            msg.sender, //address to,
+            block.timestamp + 100 // uint256 deadline
+        );
+        amountOut = amounts[amounts.length - 1];
+        // returns (uint256[] memory amounts) {
+        //     amountOut = amounts[amounts.length - 1];
+        // } catch {
+        //     revert("swapExactTokensForTokens ERROR");
+        // }
     }
 
     struct FlashParams {

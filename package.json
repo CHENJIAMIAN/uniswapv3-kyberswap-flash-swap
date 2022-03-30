@@ -13,7 +13,7 @@
         "balance": "npx hardhat balance --account",
         "block-number": "npx hardhat block-number",
         "deploy": "npx hardhat run scripts/deploy.ts",
-        "flashswaps": "npx hardhat run scripts/flashswaps.js",
+        "flashswaps": "npx hardhat run scripts/flashswaps.ts",
         "borrowDAI": "npx hardhat run scripts/borrowDAI.ts",
         "borrowETH": "npx hardhat run scripts/borrowETH.ts",
         "test": "npx hardhat test",

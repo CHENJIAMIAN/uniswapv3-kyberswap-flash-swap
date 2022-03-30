@@ -13,7 +13,7 @@ const SWAP_ROUTER = '0xE592427A0AEce92De3Edee1F18E0157C05861564';
 const uniswapv3factory = '0x1F98431c8aD98523631AE4a59f267346ea31F984';
 const KYBER_ADDRESS = '0x818E6FECD516Ecc3849DAf6845e3EC868087B755';
 const weth9 = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2';
-const DMMRouter02_ADDRESS = '0x1c87257f5e8609940bc751a07bb085bb7f8cdbe6';
+const DMMRouter02_ADDRESS = '0x1c87257f5e8609940bc751a07bb085bb7f8cdbe6';//ROUTER_ADDRESSES_V2官网用的是v2版本的swap方法
 const DMMFactory_Address = '0x833e4083B7ae46CeA85695c4f7ed25CDAd8886dE';
 const ALCHEMY_MAINNET_RPC_URL =
     'https://eth-mainnet.alchemyapi.io/v2/VtVZNO2vb5Q9ErUUDQeMTNWpkvPgA2Dp';
@@ -75,7 +75,7 @@ let state = ref({
     Timestamp: '',
 })
 
-
+let kyber_res_json;
 async function checkPairProfitable(args) {
     const { inputTokenAddress, outputTokenAddress, inputAmountWei } = args;
 
@@ -117,7 +117,7 @@ async function checkPairProfitable(args) {
         )}&saveGas=0&gasInclude=0&gasPrice=${gas_res_json.gasPrice.default
         }000000000`
     );
-    const kyber_res_json = await kyber_res.json();
+    kyber_res_json = await kyber_res.json();
     const kyberOutputAmountEther = ethers.utils.formatEther(
         kyber_res_json.outputAmount
     );
@@ -195,64 +195,12 @@ async function callFlashContract(
     //     SWAP_ROUTER,
     //     uniswapv3factory,
     //     ethers.utils.getAddress(weth9),
-    //     DMMRouter02_ADDRESS
-    //     amountOutMinHex
+    //     DMMRouter02_ADDRESS,
+    //     DMMFactory_Address,
+    //     kyber_res_json.outputAmount   // amountOutMinHex 
     // );
-    const DMMFactoryAddress = '0x833e4083B7ae46CeA85695c4f7ed25CDAd8886dE';
+  
 
-    const DAI = new Token(
-        ChainId.MAINNET,
-        borrowingTokenAddress,
-        18,
-    );
-    const USDC = new Token(
-        ChainId.MAINNET,
-        '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
-        18,
-    );
-    const tokenB = new Token(
-        ChainId.MAINNET,
-        swapingPairTokenAddress,
-        18,
-    );
-    const pairs = [];
-    temp1.swaps[0].forEach(i => {
-        const pair = await Fetcher.fetchPairData(
-            DAI,
-            USDC,
-            DMMFactoryAddress
-        );
-    })
-
-    // define route object [dai, usdc]
-    const route = new Route(pair, DAI, USDC);
-
-    debugger
-    // define initial input amount in dai
-    // const base: bigint = BigInt(Math.pow(10, route.path[0].decimals));
-    // const amountInValue: BigNumber = BigNumber.from(100).mul(base); // 100 * 10^18 == 100 dai
-    const amountInValue = utils.parseUnits(
-        amount,
-        route.path[0].decimals
-    );
-    const amountIn = new TokenAmount(
-        tokenA,
-        amountInValue.toBigInt()
-    );
-    // define trade object
-    const trade = new Trade(
-        route,
-        amountIn,
-        TradeType.EXACT_INPUT
-    );
-    // define slippage settings = 0.5%
-    const slippageTolerance = new Percent('50', '10000');
-    // compute final minimum output amount
-    const amountOutMin =
-        trade.minimumAmountOut(slippageTolerance).raw;
-    const amountOutMinHex = BigNumber.from(
-        amountOutMin.toString()
-    ).toHexString();
     const tx = await contract.initFlash(
         {
             token0: ethers.utils.getAddress(borrowingTokenAddress), //DAI
